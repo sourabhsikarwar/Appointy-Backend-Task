@@ -245,35 +245,48 @@ func calculation(businessHours string, blockHours string, appointments string, d
 				}
 			}
 		}
+	}
+
+	var checkAvailability []Availability
+
+	for i := 0; i < len(availability); i++ {
+		availabilityStartTime := availability[i].StartTime
+		availabilityEndTime := availability[i].EndTime
+		var flag int64 = 0
+
+		// checking for appointments
 
 		for j := 0; j < len(appointment); j++ {
 			appointmentStartTime := appointment[j].StartTime
 			appointmentEndTime := appointment[j].EndTime
+			availableQuantity := appointment[j].Quantity
 
-			// avoiding appointment timings
-
-			if businessStartTime <= appointmentStartTime && businessEndTime >= appointmentEndTime {
-				if businessStartTime != appointmentStartTime && availableQuantity >= quantityInt {
-					availability = append(availability, Availability{businessStartTime, appointmentStartTime})
+			if availabilityStartTime <= appointmentStartTime && availabilityEndTime >= appointmentEndTime {
+				if availabilityStartTime != appointmentStartTime && availableQuantity >= quantityInt {
+					checkAvailability = append(checkAvailability, Availability{availabilityStartTime, appointmentStartTime})
 				}
-				if appointmentEndTime != businessEndTime && availableQuantity >= quantityInt {
-					availability = append(availability, Availability{appointmentEndTime, businessEndTime})
+				if appointmentEndTime != availabilityEndTime && availableQuantity >= quantityInt {
+					checkAvailability = append(checkAvailability, Availability{appointmentEndTime, availabilityEndTime})
 				}
+				flag = 1
+			} else if availabilityStartTime <= appointmentStartTime && availabilityEndTime >= appointmentStartTime && availabilityEndTime <= appointmentEndTime {
+				if availabilityStartTime != appointmentStartTime && availableQuantity >= quantityInt {
+					checkAvailability = append(checkAvailability, Availability{availabilityStartTime, appointmentStartTime})
+				}
+				flag = 1
+			} else if availabilityStartTime >= appointmentStartTime && availabilityStartTime <= appointmentEndTime && availabilityEndTime >= appointmentEndTime {
+				if appointmentEndTime != availabilityEndTime && availableQuantity >= quantityInt {
+					checkAvailability = append(checkAvailability, Availability{appointmentEndTime, availabilityEndTime})
+				}
+				flag = 1
 			}
-			if businessStartTime <= appointmentStartTime && businessEndTime >= appointmentStartTime && businessEndTime <= appointmentEndTime {
-				if businessStartTime != appointmentStartTime && availableQuantity >= quantityInt {
-					availability = append(availability, Availability{businessStartTime, appointmentStartTime})
-				}
-			}
-			if businessStartTime >= appointmentStartTime && businessStartTime <= appointmentEndTime && businessEndTime >= appointmentEndTime {
-				if appointmentEndTime != businessEndTime && availableQuantity >= quantityInt {
-					availability = append(availability, Availability{appointmentEndTime, businessEndTime})
-				}
-			}
+		}
+		if flag == 0 {
+			checkAvailability = append(checkAvailability, Availability{availabilityStartTime, availabilityEndTime})
 		}
 	}
 
-	availabilityJson, err := json.Marshal(availability)
+	availabilityJson, err := json.Marshal(checkAvailability)
 	if err != nil {
 		fmt.Println(err)
 		return "", err
