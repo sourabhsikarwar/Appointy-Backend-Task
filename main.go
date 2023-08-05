@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -189,6 +190,31 @@ func getAppointments(resourceId string, startTime string, endTime string) (strin
 
 // Main API calculation
 
+func checkDuration(duration string, startTime string, endTime string) (string, error) {
+	newStartTime := strings.Split(startTime, "T")[1]
+	newEndTime := strings.Split(endTime, "T")[1]
+	newDurationStartHour := strings.Split(newStartTime, ":")[0]
+	newDurationEndHour := strings.Split(newEndTime, ":")[0]
+
+	durationStartHour, err := strconv.ParseInt(newDurationStartHour, 10, 64)
+	if err != nil {
+		fmt.Println(err)
+	}
+	durationEndHour, err := strconv.ParseInt(newDurationEndHour, 10, 64)
+	if err != nil {
+		fmt.Println(err)
+	}
+	newDuration, err := strconv.ParseInt(duration, 10, 64)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if (durationEndHour-durationStartHour)*60 >= newDuration {
+		return "true", nil
+	} else {
+		return "false", nil
+	}
+}
+
 func calculation(businessHours string, blockHours string, appointments string, date string, duration string, quantity string) (string, error) {
 	var businessHour []BusinessHour
 	var blockHour []BlockHour
@@ -286,7 +312,71 @@ func calculation(businessHours string, blockHours string, appointments string, d
 		}
 	}
 
-	availabilityJson, err := json.Marshal(checkAvailability)
+	var mainAvailability []Availability
+
+	for i := 0; i < len(checkAvailability); i++ {
+		availabilityStartTime := checkAvailability[i].StartTime
+		availabilityEndTime := checkAvailability[i].EndTime
+		var flag int64 = 0
+
+		// checking for appointments
+
+		for j := 0; j < len(appointment); j++ {
+			appointmentStartTime := appointment[j].StartTime
+			appointmentEndTime := appointment[j].EndTime
+			availableQuantity := appointment[j].Quantity
+
+			if availabilityStartTime <= appointmentStartTime && availabilityEndTime >= appointmentEndTime {
+				if availabilityStartTime != appointmentStartTime && availableQuantity >= quantityInt {
+					timeCheck, err := checkDuration(duration, availabilityStartTime, appointmentStartTime)
+					if timeCheck != "true" && err == nil {
+						fmt.Println(err)
+					} else {
+						mainAvailability = append(mainAvailability, Availability{availabilityStartTime, appointmentStartTime})
+					}
+				}
+				if appointmentEndTime != availabilityEndTime && availableQuantity >= quantityInt {
+					timeCheck, err := checkDuration(duration, appointmentEndTime, availabilityEndTime)
+					if timeCheck != "true" && err == nil {
+						fmt.Println(err)
+					} else {
+						mainAvailability = append(mainAvailability, Availability{appointmentEndTime, availabilityEndTime})
+					}
+				}
+				flag = 1
+			} else if availabilityStartTime <= appointmentStartTime && availabilityEndTime >= appointmentStartTime && availabilityEndTime <= appointmentEndTime {
+				if availabilityStartTime != appointmentStartTime && availableQuantity >= quantityInt {
+					timeCheck, err := checkDuration(duration, availabilityStartTime, appointmentStartTime)
+					if timeCheck != "true" && err == nil {
+						fmt.Println(err)
+					} else {
+						mainAvailability = append(mainAvailability, Availability{availabilityStartTime, appointmentStartTime})
+					}
+				}
+				flag = 1
+			} else if availabilityStartTime >= appointmentStartTime && availabilityStartTime <= appointmentEndTime && availabilityEndTime >= appointmentEndTime {
+				if appointmentEndTime != availabilityEndTime && availableQuantity >= quantityInt {
+					timeCheck, err := checkDuration(duration, appointmentEndTime, availabilityEndTime)
+					if timeCheck != "true" && err == nil {
+						fmt.Println(err)
+					} else {
+						mainAvailability = append(mainAvailability, Availability{appointmentEndTime, availabilityEndTime})
+					}
+				}
+				flag = 1
+			}
+		}
+		if flag == 0 {
+			timeCheck, err := checkDuration(duration, availabilityStartTime, availabilityEndTime)
+			if timeCheck != "true" && err == nil {
+				fmt.Println(err)
+			} else {
+				mainAvailability = append(mainAvailability, Availability{availabilityStartTime, availabilityEndTime})
+			}
+		}
+	}
+
+	availabilityJson, err := json.Marshal(mainAvailability)
 	if err != nil {
 		fmt.Println(err)
 		return "", err
